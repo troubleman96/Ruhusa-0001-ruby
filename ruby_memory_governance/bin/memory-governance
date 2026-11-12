@@ -1,0 +1,59 @@
+#!/usr/bin/env ruby
+require "fileutils"
+require "time"
+require_relative "../lib/rmg"
+
+store = RMG::Store.new
+engine = RMG::Governance.new(store: store)
+command = ARGV.shift
+
+def print_rows(rows)
+  if rows.empty?
+    puts "No records found."
+  else
+    rows.each { |row| puts row.inspect }
+  end
+end
+
+case command
+when "propose"
+  content = ARGV.shift or abort "Usage: propose \"memory text\" [importance]"
+  importance = (ARGV.shift || "5").to_i
+  result = engine.propose_create(content: content, importance: importance, requested_by: "cli-agent")
+  puts result.inspect
+when "update"
+  id = (ARGV.shift || abort("Usage: update ID \"new text\"")).to_i
+  content = ARGV.shift or abort "Usage: update ID \"new text\""
+  puts engine.propose_update(memory_id: id, content: content, requested_by: "cli-agent").inspect
+when "delete"
+  id = (ARGV.shift || abort("Usage: delete ID")).to_i
+  puts engine.propose_delete(memory_id: id, requested_by: "cli-agent").inspect
+when "pending"
+  print_rows(engine.pending)
+when "approve"
+  id = (ARGV.shift || abort("Usage: approve REQUEST_ID REVIEWER")).to_i
+  reviewer = ARGV.shift or abort "Usage: approve REQUEST_ID REVIEWER"
+  puts engine.approve(request_id: id, reviewer: reviewer, note: ARGV.join(" ")).inspect
+when "reject"
+  id = (ARGV.shift || abort("Usage: reject REQUEST_ID REVIEWER [reason]")).to_i
+  reviewer = ARGV.shift or abort "Usage: reject REQUEST_ID REVIEWER [reason]"
+  puts engine.reject(request_id: id, reviewer: reviewer, note: ARGV.join(" ")).inspect
+when "memories"
+  print_rows(engine.memories)
+when "audit"
+  print_rows(engine.audit_log)
+else
+  puts <<~HELP
+    Ruby Memory Governance demo
+
+    Commands:
+      propose "text" [importance]   Propose a new memory (importance 1-10)
+      update ID "new text"          Propose a memory update
+      delete ID                     Propose memory deletion
+      pending                       Show requests awaiting human review
+      approve REQUEST_ID REVIEWER   Approve a request
+      reject REQUEST_ID REVIEWER    Reject a request [reason]
+      memories                      List stored memories
+      audit                         Show audit events
+  HELP
+end
